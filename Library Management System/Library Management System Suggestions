@@ -1,0 +1,165 @@
+Core Assessment
+Completeness
+8/10
+You've captured all the main entities — Books, Members, Authors, Borrowing, and a separate Member Information table. That covers the core of the problem nicely. One gap though: your Books table is missing basic book attributes like title, ISBN, genre, or publication year — without these, you can't actually identify which book is which. Adding a `title` column (at minimum) is essential.
+At EASY level, capturing all key entities is the main win, and you've done that. Just round out the Books table with descriptive fields.
+Relationship Accuracy
+7/10
+Your FK from Books → Authors is correct, and Borrowing → Books and Borrowing → Members are well-placed. However, there's a subtle issue: in the Borrowing table, you've marked `book_id` and `member_id` as UNIQUE. That means each book can only ever be borrowed once and each member can only borrow once across all time — which breaks the whole purpose of a borrowing history. Remove the UNIQUE constraint from those FK columns. Also, Books.author_id is UNIQUE, which would mean each author can only write one book — same issue.
+Even at EASY, getting cardinality right matters. The UNIQUE-on-FK mistake is the biggest thing to fix here.
+Normalization
+6/10
+You correctly split Authors into its own table — good instinct. But then you duplicated `author_first_name` and `author_last_name` back into Books, which defeats the purpose. If an author changes their name, you'd have to update it in two places. Just keep author_id in Books and look up the name via JOIN. Also, splitting Members into 'Members' and 'Member Information' feels unnecessary for a small library — and `member_phone_number` appears in both tables, which is classic duplication. Merge them into one Members table.
+Normalization is a key learning goal at EASY. The author name duplication and the Members/Member Information split are the two things to clean up.
+Normalization Notes:
+The Main Normal Forms
+1.	First Normal Form (1NF): Requires all column values to be atomic (indivisible). It bans multi-valued lists or repeating groups in a single cell. [1, 2, 3]
+2.	Second Normal Form (2NF): Meets 1NF rules and ensures all non-key columns depend entirely on the primary key. It eliminates partial dependencies on composite keys. [1, 2]
+3.	Third Normal Form (3NF): Meets 2NF rules and eliminates transitive dependencies. A non-key column cannot depend on another non-key column; it must depend only on the primary key. [1, 2, 3, 4]
+Denormlization Notes:
+Denormalization is the strategic process of adding controlled redundancy back into a database schema. It is almost always performed starting from a normalized baseline. [1, 2, 3]
+•	Primary Goal: Maximize query execution speed and simplify data reads.
+•	Core Mechanism: Merging tables or duplicating attributes across fields to dramatically reduce the need for computationally heavy JOIN operations. [1, 2, 3]
+
+Integrity Constraints
+7/10
+Every table has a primary key — great. NOT NULL is used reasonably across required fields. Two things to tighten: (1) The UNIQUE constraints on FK columns in Borrowing and Books are incorrect as mentioned — they should not be unique. (2) `return_date` in Borrowing is NOT NULL, but a book that's currently checked out hasn't been returned yet — this column should be nullable so you can use `WHERE return_date IS NULL` to find currently borrowed books.
+PK usage is solid. The nullable return_date is a small but important fix for the business logic.
+Practical Alignment
+6/10
+Let's walk through the business questions: 'How many books does each member have borrowed?' — you could query Borrowing WHERE currently_borrowed = true, that works. 'Which books are overdue?' — you'd need return_date IS NULL AND due_date < NOW(), but return_date is NOT NULL right now, so this breaks. 'Most popular book' — you'd COUNT borrowings per book_id, that works. 'Which books to reorder?' — you have `low_stock` as a boolean, which is okay but it'd be more flexible to derive this from copies_available vs. copies_total. The schema mostly works but the return_date issue and missing book title block real usage.
+For EASY, the schema should be able to answer the listed business questions cleanly. Fixing return_date nullability unlocks most of these.
+Best Practices
+7/10
+Naming is mostly consistent and descriptive — `borrowing_transaction_id`, `due_date`, etc. are clear. Data types are reasonable (UUID for IDs, TIMESTAMP for dates). Two nits: avoid spaces in table names ('Member Information' should be 'member_information') because it forces quoted identifiers everywhere. Also, `member_phone_number` is VARCHAR in one table and TEXT in another — pick one and be consistent.
+Good naming habits matter from day one. These are easy wins.
+ 
+Suggested Improvements
+highEASY
+Remove the UNIQUE constraint from book_id and member_id in the Borrowing table, and from author_id in Books. UNIQUE prevents the same value from appearing twice, which would mean each book can only ever be borrowed once.
+Understanding the difference between UNIQUE and FOREIGN KEY is foundational — they answer different questions.
+highEASY
+Add a `title` column (VARCHAR) and ideally `isbn` (VARCHAR, UNIQUE) to the Books table. Right now you can't actually tell books apart.
+A schema must capture the descriptive attributes users actually search by, not just IDs.
+highEASY
+Make `return_date` in Borrowing nullable. A NULL return_date means the book is still checked out — that's how you query 'currently borrowed' and 'overdue' books.
+NULL is a powerful way to represent 'not yet happened' in time-based data.
+mediumEASY
+Merge the Members and Member Information tables into a single Members table with all the columns. Splitting them adds complexity without benefit for a small library.
+Splitting tables should be driven by a real reason (different access patterns, security), not just to keep them small.
+mediumEASY
+Remove author_first_name and author_last_name from Books. Keep only author_id as the FK — fetch names via JOIN.
+Avoiding duplicated data is the heart of normalization.
+lowEASY
+Rename 'Member Information' to 'member_information' (no spaces) and avoid quoted table names. Use snake_case consistently across all tables.
+Clean naming conventions make queries easier to write and read.
+Learning Path
+Strengths
+•	Identified all four core entities — Books, Members, Authors, Borrowing — without missing anything major
+•	Correctly placed FKs on the 'many' side (book_id and member_id in Borrowing)
+•	Used UUIDs and TIMESTAMP appropriately for IDs and dates
+•	Recognized that Authors should be a separate table from Books
+Immediate Improvements
+•	Remove UNIQUE from book_id and member_id in Borrowing, and from author_id in Books — FKs should NOT be unique on the 'many' side
+•	Add a `title` column (and ideally ISBN, genre) to the Books table
+•	Make `return_date` nullable in Borrowing so you can identify currently borrowed books with IS NULL
+•	Remove `author_first_name` and `author_last_name` from Books — they belong only in Authors
+Next Level
+•	Learn the difference between UNIQUE (no duplicates allowed) and FOREIGN KEY (references another table) — they serve very different purposes
+•	Practice normalization: the rule 'data lives in exactly one place' will save you from many bugs
+•	Get comfortable with nullable columns as a way to model state (e.g., return_date IS NULL = still borrowed)
+Advanced Concepts
+•	Many-to-many relationships with junction tables (you'll need this when a book has multiple authors)
+•	Junction Tables solve the many to many relationship. IE. many authors can write one book and one author can write many books. Throw them into a middle table with each of their primary keys as foreign keys to keep referential integrity. You can also add a composite primary key (student_id, course_id) or create a new primary key. This allows you to add more data.
+•	Derived vs. stored data: when to compute something with a query vs. store it as a column
+•	There is a fundamental trade-off between storage and compute. You need to actively consider storage costs, compute bottlenecks and query latency.
+•	An intermediate engineer just writes a view. An experienced engineer explains the architectural trade-offs of how and where that derived data is served. Tell the interviewer you evaluate three approaches:
+•	Approach A: Compute on the Fly (Virtual Views / CTEs)
+•	You keep the data strictly stored as raw files and calculate the derived fields at the exact moment the user runs a query (using SQL Views or runtime transformations).
+•	Pros: Zero extra storage cost; 100% accurate up to the second (no data staleness).
+•	Cons: High compute cost. If 10,000 users query the dashboard daily, you pay to calculate that math 10,000 times.
+•	Approach B: Materialization / Physical Storage (Pre-computation)
+•	You calculate the derived data once (e.g., via a dbt pipeline or a Materialized View) and physically write the result back to the database.
+•	Pros: Sub-second query performance. The heavy lifting is already done.
+•	Cons: Storage overhead and data drift/staleness. If a raw transaction changes, your derived table is incorrect until the next sync pipeline runs.
+•	The "Interview Mic-Drop": Framework for Decision Making
+•	When the interviewer asks, "How do you decide whether to store it or derive it?" give them this checklist:
+•	Query SLA vs. Batch Window: If an executive dashboard needs to load in under 2 seconds, I materialize (store) the derived aggregations. If it's an ad-hoc query run once a month, I compute it on the fly (derive).
+•	Volatility of Logic: If the business logic for the derivation changes frequently (e.g., how the company defines "Active User"), I keep it derived via code/views so I only have to update the logic in one place. If I store it, I’d have to backfill petabytes of historical data.
+•	Cost Economics: In modern cloud warehouses (Snowflake, BigQuery), storage is incredibly cheap, but compute can be expensive. I lean heavily toward pre-computing and storing highly complex, multi-stage joins to optimize cluster compute costs.
+
+Code Examples
+Quick Fixes
+•	CREATE TABLE books ( book_id UUID PRIMARY KEY, title VARCHAR(500) NOT NULL, isbn VARCHAR(20) UNIQUE, author_id UUID NOT NULL REFERENCES authors(author_id), total_copies INTEGER NOT NULL, available_copies INTEGER NOT NULL );
+•	CREATE TABLE borrowing ( borrowing_id UUID PRIMARY KEY, book_id UUID NOT NULL REFERENCES books(book_id), member_id UUID NOT NULL REFERENCES members(member_id), borrowed_date TIMESTAMP NOT NULL, due_date TIMESTAMP NOT NULL, return_date TIMESTAMP -- nullable: NULL means still borrowed );
+Alternative Approaches
+•	For multi-author books, create a junction table book_authors(book_id, author_id) instead of a single author_id FK on books — this is the next step up in modeling.
+•	Instead of storing `low_stock` as a boolean, derive it from available_copies < threshold in a query. This way you never have stale flags to maintain.
+ 
+ROUND 2
+Core Assessment
+Completeness
+9/10
+You've covered all the core entities — Books, Members, Authors, Borrowing, and a junction table connecting books to authors. That's a complete picture of the library system. The business questions (overdue books, popular books, active members, low stock) can all be answered from this design. Nicely done.
+At EASY level, identifying all the main entities is the biggest win — and you nailed it.
+Relationship Accuracy
+7/10
+Your Borrowing → Books and Borrowing → Members FKs are correctly placed on the 'many' side — great work. However, there's a bug in your junction table: the FK on `books_and_authors_junction_table.id` references `Authors.author_id`, but `id` is the junction's own primary key — that's incorrect. The FK should be on the `author_id` column instead. Right now your model is essentially linking the junction's PK to authors, which breaks the many-to-many setup.
+FK placement is the core skill at this level, and this one wiring mistake is the main thing holding the score back.
+Normalization
+7/10
+The separation of Books, Authors, and the junction table is well done — that's textbook normalization for a many-to-many. A few things to clean up though: `low_stock` in Books is derivable from `number_of_copies_available` and shouldn't be stored. Similarly, `current_books_borrowed`, `total_borrowed_books`, and `total_borrowed_count` are aggregates that can be computed from the Borrowing table — storing them risks drift (e.g., a member returns a book and you forget to decrement the counter). Also, `currently_borrowed` in Borrowing is redundant since you can derive it from `return_date IS NULL`.
+At EASY level, avoiding derived columns is a good habit to build early — it'll save you headaches in bigger schemas.
+Integrity Constraints
+8/10
+Every table has a primary key, and you've marked PKs as NOT NULL UNIQUE — solid. ISBN is correctly UNIQUE, which is great since it's a natural identifier. A couple of gaps: Members has no UNIQUE constraint on phone or any natural key (consider adding an email column and marking it UNIQUE), and the junction table should have a composite UNIQUE on (book_id, author_id) to prevent duplicate author-book pairings.
+Good baseline use of constraints — adding a UNIQUE on the member's natural identifier would round this out.
+Practical Alignment
+9/10
+Your schema can answer every business question posed. Overdue books? `WHERE return_date IS NULL AND due_date < NOW()`. Most popular book? Count Borrowing rows grouped by book_id. Active members? Filter on `active_member`. Low stock? Compare `number_of_copies_available` to a threshold. This is exactly what we want at this level.
+The schema directly supports the queries the question asks for — that's the bar at EASY.
+Best Practices
+8/10
+Naming is mostly consistent and descriptive — `book_id`, `member_id`, `due_date` all read clearly. Two small notes: table names mix PascalCase (`Books`, `Members`) with snake_case (`books_and_authors_junction_table`) — pick one (snake_case is conventional in PostgreSQL). Also, `publication_year` should be INTEGER or DATE, not VARCHAR(255) — storing a year as a string makes range queries awkward.
+Small polish items — your overall structure reads well.
+highEASY
+Fix the FK on `books_and_authors_junction_table` — currently the junction's `id` column references `Authors.author_id`, which is wrong. Connect the `author_id` column to `Authors.author_id` instead.
+Junction tables are the backbone of many-to-many relationships — getting the FK wiring right is essential.
+highEASY
+Remove derived columns: `Books.low_stock`, `Books.total_borrowed_count`, `Members.current_books_borrowed`, `Members.total_borrowed_books`, and `Borrowing.currently_borrowed`. These can all be computed via queries.
+Storing derived data introduces sync bugs. Better to compute it on demand or use a view later.
+mediumEASY
+Change `publication_year` from VARCHAR(255) to INTEGER (or DATE if you want full publication dates).
+Choosing the right data type makes range queries (e.g., books published after 2010) cleaner and faster.
+mediumEASY
+Add a composite UNIQUE constraint on (book_id, author_id) in the junction table to prevent the same author being linked to the same book twice.
+Composite uniqueness is the standard way to enforce integrity in junction tables.
+lowEASY
+Add an `email` column to Members and mark it UNIQUE — it's a common natural identifier for member accounts.
+Thinking about natural keys helps you spot where UNIQUE constraints belong.
+Learning Path
+Strengths
+•	You correctly identified the many-to-many between Books and Authors and built a junction table for it
+•	ISBN is marked UNIQUE — you're thinking about natural keys
+•	Borrowing table uses `return_date IS NULL` as the implicit signal for active loans (good pattern)
+•	FK relationships between Borrowing, Books, and Members are wired correctly
+Immediate Improvements
+•	Fix the junction table FK: connect `author_id` (not `id`) to `Authors.author_id`
+•	Drop derived columns: `low_stock`, `total_borrowed_count`, `current_books_borrowed`, `total_borrowed_books`, and `currently_borrowed`
+•	Change `publication_year` from VARCHAR to INTEGER
+•	Add an `email` column to Members and mark it UNIQUE
+Next Level
+•	Learn when to denormalize for performance vs. keep things normalized for correctness
+•	Study composite UNIQUE constraints for junction tables
+•	Practice spotting derived/computed columns in schemas
+Advanced Concepts
+•	Soft deletes and historical tracking for borrowing records beyond 5-year retention
+•	Audit patterns for tracking who returned what, when
+Code Examples
+Quick Fixes
+•	CREATE TABLE books_authors ( book_id UUID NOT NULL REFERENCES books(book_id), author_id UUID NOT NULL REFERENCES authors(author_id), PRIMARY KEY (book_id, author_id) );
+•	CREATE TABLE borrowing ( borrowing_transaction_id UUID PRIMARY KEY, book_id UUID NOT NULL REFERENCES books(book_id), member_id UUID NOT NULL REFERENCES members(member_id), borrowed_date TIMESTAMP NOT NULL, due_date TIMESTAMP NOT NULL, return_date TIMESTAMP -- NULL means currently borrowed );
+Alternative Approaches
+•	Instead of tracking `number_of_copies_available` as a counter, you could model each physical copy as its own row in a `book_copies` table — then availability is just `WHERE copy_id NOT IN (SELECT copy_id FROM borrowing WHERE return_date IS NULL)`. This scales better and tracks individual copy condition.
+•	If you ever expand to multiple branches, add a `branches` table and put a `branch_id` FK on `book_copies` — your current schema would need restructuring for that, but the single-location constraint makes your current design fine for now.
+
